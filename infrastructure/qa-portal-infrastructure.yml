@@ -66,8 +66,8 @@ Resources:
         Origins:
           - DomainName: !GetAtt DashboardBucket.DomainName
             Id: S3Origin
-            S3OriginConfig: {}
-            OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
         DefaultCacheBehavior:
           AllowedMethods: [GET, HEAD]
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
