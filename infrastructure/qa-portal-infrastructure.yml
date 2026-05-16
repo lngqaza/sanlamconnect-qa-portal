@@ -47,7 +47,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI.Id}'
+              AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}'
             Action: 's3:GetObject'
             Resource: !Sub '${DashboardBucket.Arn}/*'
 
@@ -61,7 +61,7 @@ Resources:
           - DomainName: !GetAtt DashboardBucket.DomainName
             Id: S3Origin
             S3OriginConfig: {}
-            OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI.Id}'
+            OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
         DefaultCacheBehavior:
           AllowedMethods: [GET, HEAD]
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
