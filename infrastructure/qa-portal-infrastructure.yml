@@ -42,14 +42,20 @@ Resources:
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref DashboardBucket
-      PolicyText:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}'
-            Action: 's3:GetObject'
-            Resource: !Sub '${DashboardBucket.Arn}/*'
+      PolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}"
+              },
+              "Action": "s3:GetObject",
+              "Resource": "${DashboardBucket.Arn}/*"
+            }
+          ]
+        }
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
