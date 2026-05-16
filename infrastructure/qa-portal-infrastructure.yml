@@ -62,7 +62,7 @@ Resources:
         Enabled: true
         DefaultRootObject: index.html
         Origins:
-          - DomainName: !GetAtt DashboardBucket.DomainName
+          - DomainName: !Sub '${DashboardBucket}.s3.${AWS::Region}.amazonaws.com'
             Id: S3Origin
             S3OriginConfig:
               OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
