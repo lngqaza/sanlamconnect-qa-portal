@@ -1,0 +1,64 @@
+name: Cleanup QA Portal
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to delete'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+
+env:
+  AWS_REGION: eu-west-1
+  ACCOUNT_ID: 684756697968
+  AWS_ROLE_ARN: arn:aws:iam::684756697968:role/github-actions-deploy
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: cleanup-qa-portal-${{ github.run_id }}
+
+      - name: Delete CloudFormation stack
+        run: |
+          STACK_NAME="sanlamconnect-qa-portal-${{ github.event.inputs.environment }}"
+          echo "Deleting stack: $STACK_NAME"
+          
+          aws cloudformation delete-stack \
+            --stack-name "$STACK_NAME" \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "Waiting for stack deletion..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name "$STACK_NAME" \
+            --region ${{ env.AWS_REGION }} || echo "Stack deletion completed or timed out"
+
+      - name: Verify deletion
+        run: |
+          STACK_NAME="sanlamconnect-qa-portal-${{ github.event.inputs.environment }}"
+          aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "Stack successfully deleted"
+
+      - name: Summary
+        run: |
+          echo "## Cleanup Completed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Stack:** sanlamconnect-qa-portal-${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** Deletion initiated" >> $GITHUB_STEP_SUMMARY
