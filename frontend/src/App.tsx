@@ -44,7 +44,6 @@ export default function App() {
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'results' | 'history'>('results');
-  const [showModeDropdown, setShowModeDropdown] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     try {
