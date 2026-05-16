@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { Play, Download, Clock, CheckCircle, AlertCircle, Loader, Copy, ChevronDown, Filter } from 'lucide-react';
+import { Play, Download, Clock, CheckCircle, AlertCircle, Loader, ChevronDown, Filter } from 'lucide-react';
 import './App.css';
 
 interface TestRun {
