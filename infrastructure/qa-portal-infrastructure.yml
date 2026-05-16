@@ -201,8 +201,10 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          TEST_RUNS_TABLE: !Ref TestRunsTable
-          LOG_GROUP: !Ref TestRunsLogGroup
+          ENVIRONMENT: !Ref Environment
+          TEST_RUNS_TABLE: !Sub 'qa-portal-test-runs-${Environment}'
+          LOG_GROUP: !Sub '/qa-portal/test-runs/${Environment}'
+          S3_BUCKET: !Sub 'sanlamconnect-qa-portal-${AWS::AccountId}-${Environment}'
       Code:
         ZipFile: |
           def handler(event, context):
@@ -219,7 +221,8 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          TEST_RUNS_TABLE: !Ref TestRunsTable
+          ENVIRONMENT: !Ref Environment
+          TEST_RUNS_TABLE: !Sub 'qa-portal-test-runs-${Environment}'
       Code:
         ZipFile: |
           def test_status_handler(event, context):
@@ -236,7 +239,8 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          LOG_GROUP: !Ref TestRunsLogGroup
+          ENVIRONMENT: !Ref Environment
+          LOG_GROUP: !Sub '/qa-portal/test-runs/${Environment}'
       Code:
         ZipFile: |
           def test_logs_handler(event, context):
@@ -253,7 +257,8 @@ Resources:
       MemorySize: 128
       Environment:
         Variables:
-          TEST_RUNS_TABLE: !Ref TestRunsTable
+          ENVIRONMENT: !Ref Environment
+          TEST_RUNS_TABLE: !Sub 'qa-portal-test-runs-${Environment}'
       Code:
         ZipFile: |
           def test_history_handler(event, context):
@@ -270,9 +275,10 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          TEST_RUNS_TABLE: !Ref TestRunsTable
-          TEST_REPORTS_TABLE: !Ref TestReportsTable
-          S3_BUCKET: !Ref DashboardBucket
+          ENVIRONMENT: !Ref Environment
+          TEST_RUNS_TABLE: !Sub 'qa-portal-test-runs-${Environment}'
+          TEST_REPORTS_TABLE: !Sub 'qa-portal-test-reports-${Environment}'
+          S3_BUCKET: !Sub 'sanlamconnect-qa-portal-${AWS::AccountId}-${Environment}'
       Code:
         ZipFile: |
           def report_generator_handler(event, context):
