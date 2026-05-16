@@ -7,10 +7,24 @@ from dynamodb_service import TestRunsDB
 dynamodb = boto3.resource('dynamodb')
 db = TestRunsDB(dynamodb)
 
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Content-Type': 'application/json'
+}
+
 
 def handler(event, context):
     """POST /test/execute - Queue a test run"""
     try:
+        if event.get('httpMethod') == 'OPTIONS':
+            return {
+                'statusCode': 204,
+                'headers': CORS_HEADERS,
+                'body': ''
+            }
+
         body = json.loads(event.get('body', '{}'))
         mode = body.get('mode')
         suites = body.get('suites', [])
@@ -18,6 +32,7 @@ def handler(event, context):
         if not mode or not suites:
             return {
                 'statusCode': 400,
+                'headers': CORS_HEADERS,
                 'body': json.dumps({'error': 'Missing mode or suites'})
             }
 
@@ -37,6 +52,7 @@ def handler(event, context):
         # For now, return queued status
         return {
             'statusCode': 202,
+            'headers': CORS_HEADERS,
             'body': json.dumps({
                 'run_id': run_id,
                 'status': 'queued',
@@ -47,5 +63,6 @@ def handler(event, context):
     except Exception as e:
         return {
             'statusCode': 500,
+            'headers': CORS_HEADERS,
             'body': json.dumps({'error': str(e)})
         }

@@ -29,60 +29,32 @@ jobs:
     steps:
       # ==================== CHECKOUT ====================
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # ==================== AWS CREDENTIALS ====================
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
-      # ==================== BUILD FRONTEND ====================
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
-
-      - name: Install dependencies
-        run: |
-          cd frontend
-          npm install
-
-      - name: Build React dashboard
-        run: |
-          cd frontend
-          npm run build
-        env:
-          REACT_APP_API_URL: ${{ secrets.API_BASE_URL }}
-          REACT_APP_ENVIRONMENT: ${{ github.event.inputs.environment }}
-
-      - name: Upload frontend to S3
-        run: |
-          aws s3 sync frontend/build/ s3://sanlamconnect-qa-portal-${{ env.ACCOUNT_ID }}-${{ github.event.inputs.environment }}/ \
-            --delete \
-            --cache-control "max-age=3600"
+          role-session-name: qa-portal-${{ github.run_id }}
 
       # ==================== PACKAGE LAMBDA FUNCTIONS ====================
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: 'backend/requirements.txt'
 
-      - name: Install Python dependencies
+      - name: Build Lambda package
         run: |
-          cd backend
-          pip install -r requirements.txt -t package/
-
-      - name: Package Lambda functions
-        run: |
-          cd backend
-          zip -r lambda-package.zip . -x "*.git*" "package.json" "*.md"
-          mv lambda-package.zip ../infrastructure/
+          rm -rf backend/build infrastructure/lambda-package.zip
+          mkdir -p backend/build
+          pip install -r backend/requirements.txt -t backend/build/
+          cp backend/*.py backend/build/
+          cd backend/build
+          zip -r ../../infrastructure/lambda-package.zip .
 
       # ==================== DEPLOY CLOUDFORMATION ====================
       - name: Deploy CloudFormation stack
@@ -94,6 +66,70 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --region ${{ env.AWS_REGION }}
+
+      - name: Update Lambda function code
+        run: |
+          for function_name in \
+            qa-portal-test-executor-${{ github.event.inputs.environment }} \
+            qa-portal-test-status-${{ github.event.inputs.environment }} \
+            qa-portal-test-logs-${{ github.event.inputs.environment }} \
+            qa-portal-test-history-${{ github.event.inputs.environment }} \
+            qa-portal-report-generator-${{ github.event.inputs.environment }}
+          do
+            aws lambda update-function-code \
+              --function-name "$function_name" \
+              --zip-file fileb://infrastructure/lambda-package.zip \
+              --region ${{ env.AWS_REGION }}
+          done
+
+      - name: Get deployment outputs
+        id: outputs
+        run: |
+          DASHBOARD_URL=$(aws cloudformation describe-stacks \
+            --stack-name sanlamconnect-qa-portal-${{ github.event.inputs.environment }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`DashboardUrl`].OutputValue' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name sanlamconnect-qa-portal-${{ github.event.inputs.environment }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          S3_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name sanlamconnect-qa-portal-${{ github.event.inputs.environment }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          echo "dashboard_url=$DASHBOARD_URL" >> $GITHUB_OUTPUT
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "s3_bucket=$S3_BUCKET" >> $GITHUB_OUTPUT
+
+      # ==================== BUILD FRONTEND ====================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build React dashboard
+        run: |
+          cd frontend
+          npm run build
+        env:
+          REACT_APP_API_URL: ${{ steps.outputs.outputs.api_url }}
+          REACT_APP_ENVIRONMENT: ${{ github.event.inputs.environment }}
+
+      - name: Upload frontend to S3
+        run: |
+          aws s3 sync frontend/build/ s3://${{ steps.outputs.outputs.s3_bucket }}/ \
+            --delete \
+            --cache-control "max-age=3600"
 
       # ==================== INVALIDATE CLOUDFRONT ====================
       - name: Get CloudFront Distribution ID
@@ -115,22 +151,6 @@ jobs:
             --paths "/*"
 
       # ==================== POST-DEPLOYMENT ====================
-      - name: Get deployment outputs
-        id: outputs
-        run: |
-          DASHBOARD_URL=$(aws cloudformation describe-stacks \
-            --stack-name sanlamconnect-qa-portal-${{ github.event.inputs.environment }} \
-            --query 'Stacks[0].Outputs[?OutputKey==`DashboardUrl`].OutputValue' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-          API_URL=$(aws cloudformation describe-stacks \
-            --stack-name sanlamconnect-qa-portal-${{ github.event.inputs.environment }} \
-            --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-          echo "dashboard_url=$DASHBOARD_URL" >> $GITHUB_OUTPUT
-          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
-
       - name: Post deployment summary
         run: |
           echo "## QA Portal Deployment Summary" >> $GITHUB_STEP_SUMMARY
@@ -141,9 +161,11 @@ jobs:
           echo "**Deployment Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
 
       - name: Send Slack notification
-        if: success()
-        uses: slackapi/slack-github-action@v1.24.0
+        if: success() && env.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v2.0.0
         with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
           payload: |
             {
               "text": "QA Portal deployed to ${{ github.event.inputs.environment }} ✅",
@@ -159,7 +181,6 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Handle deployment failure
         if: failure()

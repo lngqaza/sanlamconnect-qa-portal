@@ -60,17 +60,17 @@ Resources:
         Origins:
           - DomainName: !GetAtt DashboardBucket.DomainName
             Id: S3Origin
-            S3OriginConfig: {}
-            OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
         DefaultCacheBehavior:
           AllowedMethods: [GET, HEAD]
-          CachePolicyId: 4135ea3d-c35d-46eb-81d7-reeSFmxDapQQ
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
         CacheBehaviors:
           - PathPattern: 'reports/*'
             AllowedMethods: [GET, HEAD]
-            CachePolicyId: 4135ea3d-c35d-46eb-81d7-reeSFmxDapQQ
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
             TargetOriginId: S3Origin
             ViewerProtocolPolicy: https-only
 
@@ -164,6 +164,7 @@ Resources:
                 Resource:
                   - !GetAtt TestRunsTable.Arn
                   - !GetAtt TestReportsTable.Arn
+                  - !Sub '${TestReportsTable.Arn}/index/*'
         - PolicyName: CloudWatchLogsAccess
           PolicyDocument:
             Version: '2012-10-17'
@@ -174,7 +175,9 @@ Resources:
                   - 'logs:PutLogEvents'
                   - 'logs:GetLogEvents'
                   - 'logs:FilterLogEvents'
-                Resource: !GetAtt TestRunsLogGroup.Arn
+                Resource:
+                  - !GetAtt TestRunsLogGroup.Arn
+                  - !Sub '${TestRunsLogGroup.Arn}:*'
         - PolicyName: S3Access
           PolicyDocument:
             Version: '2012-10-17'
@@ -183,7 +186,6 @@ Resources:
                 Action:
                   - 's3:PutObject'
                   - 's3:GetObject'
-                  - 's3:GeneratePresignedUrl'
                 Resource: !Sub '${DashboardBucket.Arn}/*'
 
   # ==================== LAMBDA FUNCTIONS ====================
@@ -287,10 +289,187 @@ Resources:
         Types:
           - REGIONAL
 
+  TestResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: test
+
+  TestExecuteResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref TestResource
+      PathPart: execute
+
+  TestHistoryResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref TestResource
+      PathPart: history
+
+  TestRunResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref TestResource
+      PathPart: '{run_id}'
+
+  TestRunStatusResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref TestRunResource
+      PathPart: status
+
+  TestRunLogsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref TestRunResource
+      PathPart: logs
+
+  ReportResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: report
+
+  ReportGenerateResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !Ref ReportResource
+      PathPart: generate
+
+  TestExecuteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref TestExecuteResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TestExecutorFunction.Arn}/invocations'
+
+  TestHistoryMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref TestHistoryResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TestHistoryFunction.Arn}/invocations'
+
+  TestStatusMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref TestRunStatusResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.run_id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TestStatusFunction.Arn}/invocations'
+
+  TestLogsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref TestRunLogsResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.run_id: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TestLogsFunction.Arn}/invocations'
+
+  ReportGenerateMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ReportGenerateResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportGeneratorFunction.Arn}/invocations'
+
+  TestExecuteOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties: &CorsOptionsMethod
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref TestExecuteResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 204}'
+        IntegrationResponses:
+          - StatusCode: 204
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: 204
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  TestHistoryOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      <<: *CorsOptionsMethod
+      ResourceId: !Ref TestHistoryResource
+
+  TestStatusOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      <<: *CorsOptionsMethod
+      ResourceId: !Ref TestRunStatusResource
+
+  TestLogsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      <<: *CorsOptionsMethod
+      ResourceId: !Ref TestRunLogsResource
+
+  ReportGenerateOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      <<: *CorsOptionsMethod
+      ResourceId: !Ref ReportGenerateResource
+
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - ApiGateway
+      - TestExecuteMethod
+      - TestHistoryMethod
+      - TestStatusMethod
+      - TestLogsMethod
+      - ReportGenerateMethod
+      - TestExecuteOptionsMethod
+      - TestHistoryOptionsMethod
+      - TestStatusOptionsMethod
+      - TestLogsOptionsMethod
+      - ReportGenerateOptionsMethod
     Properties:
       RestApiId: !Ref ApiGateway
 
@@ -300,8 +479,6 @@ Resources:
       StageName: !Ref Environment
       RestApiId: !Ref ApiGateway
       DeploymentId: !Ref ApiDeployment
-      LoggingLevel: INFO
-      DataTraceEnabled: true
 
   # ==================== LAMBDA PERMISSIONS ====================
 
@@ -311,7 +488,39 @@ Resources:
       FunctionName: !Ref TestExecutorFunction
       Action: 'lambda:InvokeFunction'
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*'
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/test/execute'
+
+  TestStatusInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref TestStatusFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/GET/test/*/status'
+
+  TestLogsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref TestLogsFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/GET/test/*/logs'
+
+  TestHistoryInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref TestHistoryFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/GET/test/history'
+
+  ReportGeneratorInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ReportGeneratorFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/POST/report/generate'
 
 Outputs:
   DashboardUrl:

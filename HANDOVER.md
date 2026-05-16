@@ -1,6 +1,6 @@
 # QA Portal — Handover Documentation
 
-**Status:** GitHub repo created, code pushed, secrets configured. Workflow deployment pending.
+**Status:** Deployment workflow exists, but AWS OIDC authentication must be fixed before the workflow can deploy.
 
 **Date:** 2026-05-16  
 **Owner:** lngqaza  
@@ -31,15 +31,15 @@
 
 ## What's Pending
 
-❌ **GitHub Actions Workflow**
-- Workflow file: `.github/workflows/deploy-qa-portal.yml` (in repo)
-- Issue: Not appearing in Actions tab on GitHub web UI
-- Likely cause: GitHub hasn't indexed workflow file yet
-- Solution: Wait 5-10 minutes or hard refresh, then check Actions tab
+❌ **GitHub Actions AWS Authentication**
+- Workflow file: `.github/workflows/deploy-qa-portal.yml` exists in the repo.
+- Current failure: `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
+- AWS account `684756697968` does not currently expose a `github-actions-deploy` role to this handover session.
+- Fix: create or repair the GitHub OIDC role using `infrastructure/github-actions-oidc-role.yml`, then rerun the workflow.
 
 ❌ **AWS Deployment**
 - CloudFormation stack not yet deployed
-- Requires workflow to run successfully
+- Requires GitHub Actions OIDC auth to succeed
 - Stack name: `sanlamconnect-qa-portal-dev`
 - Region: `eu-west-1`
 
@@ -47,14 +47,43 @@
 
 ## Next Steps (Priority Order)
 
-### 1. Verify Workflow Appears (5 min)
+### 1. Create or Repair GitHub Actions OIDC Role (5 min)
+Run this once from an AWS principal with IAM and CloudFormation permissions:
+```bash
+aws cloudformation deploy \
+  --template-file infrastructure/github-actions-oidc-role.yml \
+  --stack-name sanlamconnect-qa-portal-github-oidc \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region eu-west-1
+```
+
+If the AWS account already has a GitHub OIDC provider, pass it instead of creating a duplicate:
+```bash
+aws cloudformation deploy \
+  --template-file infrastructure/github-actions-oidc-role.yml \
+  --stack-name sanlamconnect-qa-portal-github-oidc \
+  --parameter-overrides ExistingOidcProviderArn=arn:aws:iam::684756697968:oidc-provider/token.actions.githubusercontent.com \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region eu-west-1
+```
+
+Expected output role:
+```
+arn:aws:iam::684756697968:role/github-actions-deploy
+```
+
+If the role already exists, verify its trust policy allows:
+```text
+repo:lngqaza/sanlamconnect-qa-portal:ref:refs/heads/main
+```
+
+### 2. Verify Workflow Appears (1 min)
 ```
 URL: https://github.com/lngqaza/sanlamconnect-qa-portal/actions
 Expected: See "Deploy QA Portal" workflow in list
-If not: Hard refresh (Ctrl+Shift+R), wait 5 min, try again
 ```
 
-### 2. Manual Workflow Trigger (2 min)
+### 3. Manual Workflow Trigger (2 min)
 ```
 Click: "Deploy QA Portal" workflow
 Click: "Run workflow" button
@@ -62,14 +91,14 @@ Select: environment = "dev"
 Click: "Run workflow"
 ```
 
-### 3. Monitor Deployment (10 min)
+### 4. Monitor Deployment (10 min)
 ```
 Watch workflow run in Actions tab
 Expected time: ~10 minutes
 Check for: ✅ Success or ❌ Failure
 ```
 
-### 4. Get Dashboard URL (1 min)
+### 5. Get Dashboard URL (1 min)
 ```
 In workflow run:
 Find: "Post deployment summary" step
@@ -77,7 +106,7 @@ Copy: Dashboard URL (CloudFront domain)
 Format: https://[cloudfront-id].cloudfront.net/
 ```
 
-### 5. Test Dashboard (5 min)
+### 6. Test Dashboard (5 min)
 ```
 Open dashboard URL in browser
 Expected: React SPA with test controls
@@ -89,16 +118,38 @@ Expected: Queue test run, get run_id, polling starts
 
 ## Troubleshooting
 
-### Workflow Not Showing in Actions Tab
+### STS AssumeRoleWithWebIdentity Failure
 
-**Symptom:** Actions tab is empty, no "Deploy QA Portal" listed
+**Symptom:** Workflow fails at "Configure AWS Credentials":
+```text
+Error: Not authorized to perform sts:AssumeRoleWithWebIdentity
+```
 
 **Solution:**
-1. Hard refresh: `Ctrl+Shift+R`
-2. Wait 5-10 minutes for GitHub to index
-3. Check repo has files: https://github.com/lngqaza/sanlamconnect-qa-portal
-4. Verify `.github/workflows/deploy-qa-portal.yml` exists
-5. If still missing, re-push: `git push --force origin main`
+1. Confirm role exists:
+   ```bash
+   aws iam get-role --role-name github-actions-deploy
+   ```
+2. If missing, deploy `infrastructure/github-actions-oidc-role.yml`.
+3. Confirm the role trust policy allows GitHub OIDC subject:
+   ```text
+   repo:lngqaza/sanlamconnect-qa-portal:ref:refs/heads/main
+   ```
+4. Confirm workflow has:
+   ```yaml
+   permissions:
+     id-token: write
+     contents: read
+   ```
+
+### AWS SDK for JavaScript v2 Warning
+
+**Symptom:** Workflow logs show:
+```text
+Please migrate your code to use AWS SDK for JavaScript (v3).
+```
+
+**Status:** The repo does not use the JavaScript AWS SDK directly. The warning came from older GitHub Actions dependencies. The workflow has been updated to current actions, including `aws-actions/configure-aws-credentials@v4`.
 
 ### Workflow Fails During Execution
 
@@ -164,7 +215,8 @@ sanlamconnect-qa-portal/
 │   └── requirements.txt     (boto3, reportlab, pillow, jinja2, etc.)
 │
 ├── infrastructure/
-│   └── qa-portal-infrastructure.yml  (CloudFormation, 450 lines)
+│   ├── github-actions-oidc-role.yml  (GitHub OIDC deploy role)
+│   └── qa-portal-infrastructure.yml  (CloudFormation)
 │
 ├── .github/
 │   └── workflows/
@@ -184,8 +236,9 @@ sanlamconnect-qa-portal/
 **Region:** eu-west-1  
 **Environment:** dev (also supports staging, production)
 
-**GitHub Secrets (already configured):**
-- `API_BASE_URL` = `https://api-qa-portal.eu-west-1.amazonaws.com`
+**GitHub Secrets:**
+- `API_BASE_URL` is no longer required by the deployment workflow. The workflow reads the API Gateway URL from CloudFormation outputs before building the React app.
+- `SLACK_WEBHOOK_URL` is optional. Slack notification is skipped when it is absent.
 
 **AWS Resources (to be created by CloudFormation):**
 - API Gateway REST API
@@ -266,6 +319,6 @@ For issues:
 
 ---
 
-**Last Updated:** 2026-05-16 14:00 UTC  
-**Status:** Ready for workflow deployment  
+**Last Updated:** 2026-05-16 15:00 UTC
+**Status:** Blocked on GitHub Actions OIDC role creation/repair
 **Next Owner:** Codex / Deployment Team

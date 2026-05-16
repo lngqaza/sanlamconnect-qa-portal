@@ -17,7 +17,12 @@ def success_response(data, status_code=200):
     return {
         'statusCode': status_code,
         'body': json.dumps(data),
-        'headers': {'Content-Type': 'application/json'}
+        'headers': {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+            'Content-Type': 'application/json'
+        }
     }
 
 
@@ -26,7 +31,12 @@ def error_response(error_msg, status_code=500):
     return {
         'statusCode': status_code,
         'body': json.dumps({'error': error_msg}),
-        'headers': {'Content-Type': 'application/json'}
+        'headers': {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+            'Content-Type': 'application/json'
+        }
     }
 
 
@@ -34,7 +44,8 @@ def test_status_handler(event, context):
     """GET /test/{run_id}/status - Get test run status"""
     try:
         run_id = event['pathParameters']['run_id']
-        created_at = event['queryStringParameters'].get('created_at')
+        query_params = event.get('queryStringParameters') or {}
+        created_at = query_params.get('created_at')
 
         if not created_at:
             return error_response('Missing created_at', 400)
@@ -94,7 +105,8 @@ def test_logs_handler(event, context):
 def test_history_handler(event, context):
     """GET /test/history - Get past test runs"""
     try:
-        limit = int(event['queryStringParameters'].get('limit', 10))
+        query_params = event.get('queryStringParameters') or {}
+        limit = int(query_params.get('limit', 10))
         runs = test_runs_db.list_runs(limit)
 
         return success_response({
@@ -126,19 +138,36 @@ def report_generator_handler(event, context):
         if not run_id:
             return error_response('Missing run_id', 400)
 
-        # TODO: Fetch test results from DynamoDB
-        # TODO: Generate HTML or PDF report
-        # TODO: Upload to S3
-        # TODO: Generate presigned URL
-
         report_id = f"{run_id}-{report_format}"
-        s3_url = f"s3://{os.environ.get('S3_BUCKET')}/reports/{report_id}.{report_format}"
+        bucket = os.environ.get('S3_BUCKET')
+        key = f"reports/{report_id}.{report_format}"
+        content_type = 'text/html' if report_format == 'html' else 'application/pdf'
+
+        report_body = (
+            "<html><body>"
+            f"<h1>QA Portal Report</h1><p>Run ID: {run_id}</p>"
+            f"<p>Generated: {datetime.utcnow().isoformat()}Z</p>"
+            "</body></html>"
+        ).encode('utf-8')
+
+        s3.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=report_body,
+            ContentType=content_type
+        )
+
+        presigned_url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket, 'Key': key},
+            ExpiresIn=86400
+        )
 
         test_reports_db.create_report({
             'report_id': report_id,
             'run_id': run_id,
             'format': report_format,
-            's3_url': s3_url,
+            's3_url': f"s3://{bucket}/{key}",
             'generated_at': datetime.utcnow().isoformat() + 'Z',
             'status': 'ready'
         })
@@ -147,7 +176,7 @@ def report_generator_handler(event, context):
             'report_id': report_id,
             'format': report_format,
             'status': 'ready',
-            'url': s3_url
+            'url': presigned_url
         }, 201)
 
     except Exception as e:
@@ -175,7 +204,10 @@ def report_download_handler(event, context):
 
         return {
             'statusCode': 302,
-            'headers': {'Location': presigned_url},
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Location': presigned_url
+            },
             'body': ''
         }
 

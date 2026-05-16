@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { Play, Download, RefreshCw, Clock } from 'lucide-react';
+import { Play, Download, Clock } from 'lucide-react';
 import './App.css';
 
 interface TestRun {
@@ -39,10 +39,19 @@ export default function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'results' | 'history'>('results');
 
+  const fetchHistory = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE}/test/history?limit=10`);
+      setRuns(response.data.runs || []);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    }
+  }, [API_BASE]);
+
   // Fetch test history on mount
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
 
   // Poll for test status every 5 seconds
   useEffect(() => {
@@ -66,16 +75,7 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [currentRun]);
-
-  async function fetchHistory() {
-    try {
-      const response = await axios.get(`${API_BASE}/test/history?limit=10`);
-      setRuns(response.data.runs || []);
-    } catch (error) {
-      console.error('Error fetching history:', error);
-    }
-  }
+  }, [API_BASE, currentRun]);
 
   async function executeTests() {
     if (selectedSuites.length === 0) {
