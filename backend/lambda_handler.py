@@ -1,0 +1,51 @@
+import json
+import uuid
+from datetime import datetime
+import boto3
+from dynamodb_service import TestRunsDB
+
+dynamodb = boto3.resource('dynamodb')
+db = TestRunsDB(dynamodb)
+
+
+def handler(event, context):
+    """POST /test/execute - Queue a test run"""
+    try:
+        body = json.loads(event.get('body', '{}'))
+        mode = body.get('mode')
+        suites = body.get('suites', [])
+
+        if not mode or not suites:
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Missing mode or suites'})
+            }
+
+        run_id = str(uuid.uuid4())
+        timestamp = datetime.utcnow().isoformat() + 'Z'
+
+        db.create_run({
+            'run_id': run_id,
+            'mode': mode,
+            'suites': suites,
+            'status': 'pending',
+            'created_at': timestamp,
+            'created_by': 'user@sanlamconnect.com'
+        })
+
+        # TODO: Trigger async test execution
+        # For now, return queued status
+        return {
+            'statusCode': 202,
+            'body': json.dumps({
+                'run_id': run_id,
+                'status': 'queued',
+                'timestamp': timestamp
+            })
+        }
+
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
