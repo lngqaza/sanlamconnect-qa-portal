@@ -13,7 +13,7 @@ Resources:
   DashboardBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'sanlamconnect-qa-portal-${AWS::AccountId}-${Environment}'
+      BucketName: !Sub '${AWS::StackName}-dashboard-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -208,7 +208,7 @@ Resources:
           ENVIRONMENT: !Ref Environment
           TEST_RUNS_TABLE: !Sub 'qa-portal-test-runs-${Environment}'
           LOG_GROUP: !Sub '/qa-portal/test-runs/${Environment}'
-          S3_BUCKET: !Sub 'sanlamconnect-qa-portal-${AWS::AccountId}-${Environment}'
+          S3_BUCKET: !Ref DashboardBucket
       Code:
         ZipFile: |
           def handler(event, context):
@@ -282,7 +282,7 @@ Resources:
           ENVIRONMENT: !Ref Environment
           TEST_RUNS_TABLE: !Sub 'qa-portal-test-runs-${Environment}'
           TEST_REPORTS_TABLE: !Sub 'qa-portal-test-reports-${Environment}'
-          S3_BUCKET: !Sub 'sanlamconnect-qa-portal-${AWS::AccountId}-${Environment}'
+          S3_BUCKET: !Ref DashboardBucket
       Code:
         ZipFile: |
           def report_generator_handler(event, context):
