@@ -18,20 +18,20 @@ interface TestRun {
 }
 
 const SUITES = [
-  { id: 'alarms', label: 'CloudWatch Alarms', description: '5 critical incident alarms' },
-  { id: 'financial-calc', label: 'Financial Calculator', description: 'Cost impact validation' },
-  { id: 'dashboard', label: 'Dashboard Refresh', description: 'KPI injection & metrics' },
-  { id: 'reports', label: 'Scheduled Reports', description: 'Report generation pipeline' },
-  { id: 'exceptions', label: 'Exception Monitoring', description: 'SLA threshold detection' },
-  { id: 'selfheal', label: 'Self-Healing', description: 'Circuit breaker & recovery' },
-  { id: 'notifications', label: 'Alarm Notifications', description: 'Alert delivery chain' },
-  { id: 'consistency', label: 'Data Consistency', description: 'Cross-system validation' }
+  { id: 'alarms', label: 'Alert System Health', description: 'Do alerts get sent when problems occur?' },
+  { id: 'financial-calc', label: 'Cost Impact Calculation', description: 'Is downtime cost calculated correctly?' },
+  { id: 'dashboard', label: 'Metrics Accuracy', description: 'Are live metrics updating correctly?' },
+  { id: 'reports', label: 'Report Generation', description: 'Can we generate compliance reports?' },
+  { id: 'exceptions', label: 'Problem Detection', description: 'Do we catch issues before they spread?' },
+  { id: 'selfheal', label: 'Automatic Recovery', description: 'Can we recover from failures automatically?' },
+  { id: 'notifications', label: 'Notification Delivery', description: 'Are alerts being sent to the right people?' },
+  { id: 'consistency', label: 'Cross-System Sync', description: 'Is data correct across all systems?' }
 ];
 
 const MODE_INFO = {
-  'dry-run': { label: 'Dry-Run', duration: '~2 min', color: 'blue', desc: 'Syntax validation only' },
-  'mock': { label: 'Mock', duration: '~5 min', color: 'purple', desc: 'Logic validation with test data' },
-  'live': { label: 'Live', duration: '~45 min', color: 'rose', desc: 'Full integration testing' }
+  'dry-run': { label: 'Quick Check', duration: '~2 min', color: 'blue', desc: 'Verify structure & syntax only' },
+  'mock': { label: 'Standard Check', duration: '~5 min', color: 'purple', desc: 'Verify logic with safe test data' },
+  'live': { label: 'Full Check', duration: '~45 min', color: 'rose', desc: 'Real system validation' }
 };
 
 export default function App() {
@@ -85,7 +85,7 @@ export default function App() {
 
   async function executeTests() {
     if (selectedSuites.length === 0) {
-      alert('Select at least one test suite');
+      alert('Select at least one system to check');
       return;
     }
 
@@ -110,7 +110,7 @@ export default function App() {
       setActiveTab('results');
       await fetchHistory();
     } catch (error) {
-      alert('Failed to execute tests: ' + (error as any).message);
+      alert('Failed to run validation: ' + (error as any).message);
     } finally {
       setIsExecuting(false);
     }
@@ -118,7 +118,7 @@ export default function App() {
 
   async function generateReport(format: 'html' | 'pdf') {
     if (!currentRun) {
-      alert('No test run selected');
+      alert('No validation run selected');
       return;
     }
 
@@ -134,7 +134,7 @@ export default function App() {
       link.download = `report.${format}`;
       link.click();
     } catch (error) {
-      alert('Failed to generate report: ' + (error as any).message);
+      alert('Could not generate report: ' + (error as any).message);
     }
   }
 
@@ -159,9 +159,9 @@ export default function App() {
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700 px-6 py-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg"></div>
-            <h1 className="text-3xl font-bold text-white">QA Portal</h1>
+            <h1 className="text-3xl font-bold text-white">Validation Lab</h1>
           </div>
-          <p className="text-slate-400">Dynatrace Monitoring Validation & Test Execution</p>
+          <p className="text-slate-400">System Health Verification</p>
         </div>
 
         <div className="p-6">
@@ -172,12 +172,12 @@ export default function App() {
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 sticky top-6">
               <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                 <Filter size={18} />
-                Test Configuration
+                What Do You Want to Check?
               </h2>
 
               {/* Mode Selection */}
               <div className="mb-8">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Execution Mode</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">How Thorough?</label>
                 <div className="space-y-2">
                   {['dry-run', 'mock', 'live'].map((m) => {
                     const info = MODE_INFO[m as keyof typeof MODE_INFO];
@@ -204,7 +204,7 @@ export default function App() {
               {/* Suite Selection */}
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-3">
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Test Suites</label>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Which Systems?</label>
                   <span className="text-xs text-slate-500">{selectedSuites.length} selected</span>
                 </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
@@ -269,7 +269,7 @@ export default function App() {
                       : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
                   }`}
                 >
-                  Current Results
+                  Validation Results
                 </button>
                 <button
                   onClick={() => setActiveTab('history')}
@@ -388,7 +388,7 @@ export default function App() {
                       <Clock size={48} className="mx-auto mb-4 opacity-30 text-slate-500" />
                       <h3 className="text-xl font-semibold text-slate-300 mb-2">No Test Run Yet</h3>
                       <p className="text-slate-400 max-w-sm mx-auto">
-                        Select one or more test suites on the left and click "Execute Tests" to begin validation.
+                        Select one or more systems on the left and click "Run Validation" to begin checking.
                       </p>
                     </div>
                   )}
