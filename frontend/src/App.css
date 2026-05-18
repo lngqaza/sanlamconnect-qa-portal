@@ -2,6 +2,32 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+/* Design System Colors (from DESIGN_SYSTEM.md) */
+:root {
+  /* Primary Colors */
+  --color-deep-blue: #003478;
+  --color-brand-blue: #0057A8;
+  --color-light-blue: #0099CC;
+
+  /* Status Colors */
+  --color-success: #2D9E5F;
+  --color-warning: #E8A200;
+  --color-critical: #C8002B;
+  --color-neutral: #6B7280;
+  --color-info: #6B46C1;
+
+  /* Background Colors */
+  --color-dark-navy: #0D1B2E;
+  --color-darker-navy: #060F1C;
+  --color-light-gray: #F0F4F8;
+  --color-medium-gray: #374151;
+
+  /* Text Colors */
+  --color-primary-text: #F3F4F6;
+  --color-secondary-text: #D1D5DB;
+  --color-disabled-text: #9CA3AF;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -18,7 +44,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  @apply bg-slate-950 text-white;
+  background-color: var(--color-dark-navy);
+  color: var(--color-primary-text);
 }
 
 /* Animations */
@@ -47,45 +74,127 @@ body {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Custom scrollbar - dark theme */
+/* Custom scrollbar - design system colors */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--color-darker-navy);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--color-medium-gray);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--color-brand-blue);
 }
 
 /* Smooth transitions */
 button, a, input, textarea {
-  @apply transition-all duration-200;
+  transition: all 0.2s ease-in-out;
 }
 
-/* Focus states */
+/* Focus states - design system */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible {
-  @apply outline-2 outline-offset-2 outline-blue-400;
+  outline: 2px solid var(--color-brand-blue);
+  outline-offset: 2px;
 }
 
 /* Input styling */
 input[type="radio"],
 input[type="checkbox"] {
-  accent-color: #3b82f6;
+  accent-color: var(--color-brand-blue);
 }
 
 /* Selection styling */
 ::selection {
-  @apply bg-blue-500 text-white;
+  background-color: var(--color-brand-blue);
+  color: white;
+}
+
+/* Status colors for alerts and badges */
+.status-success {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.status-warning {
+  background-color: var(--color-warning);
+  color: white;
+}
+
+.status-critical {
+  background-color: var(--color-critical);
+  color: white;
+}
+
+.status-info {
+  background-color: var(--color-info);
+  color: white;
+}
+
+/* Button design system */
+.btn-primary {
+  background-color: var(--color-brand-blue);
+  color: var(--color-primary-text);
+  padding: 10px 20px;
+  border-radius: 4px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-deep-blue);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.btn-primary:disabled {
+  background-color: var(--color-neutral);
+  color: var(--color-disabled-text);
+  cursor: not-allowed;
+}
+
+/* Typography hierarchy */
+h1 {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--color-deep-blue);
+  line-height: 1.4;
+  margin: 0 0 24px 0;
+}
+
+h2 {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--color-deep-blue);
+  line-height: 1.3;
+  margin: 24px 0 16px 0;
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-deep-blue);
+  line-height: 1.3;
+  margin: 16px 0 12px 0;
+}
+
+p {
+  font-size: 14px;
+  color: var(--color-primary-text);
+  line-height: 1.5;
+}
+
+small, .text-sm {
+  font-size: 12px;
+  color: var(--color-secondary-text);
 }

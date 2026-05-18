@@ -33,7 +33,7 @@ def handler(event, context):
             return {
                 'statusCode': 400,
                 'headers': CORS_HEADERS,
-                'body': json.dumps({'error': 'Missing mode or suites'})
+                'body': json.dumps({'error': 'Please select execution mode and at least one system to check'})
             }
 
         run_id = str(uuid.uuid4())

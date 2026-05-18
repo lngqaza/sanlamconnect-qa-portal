@@ -48,12 +48,12 @@ def test_status_handler(event, context):
         created_at = query_params.get('created_at')
 
         if not created_at:
-            return error_response('Missing created_at', 400)
+            return error_response('Validation timestamp is required', 400)
 
         run = test_runs_db.get_run(run_id, created_at)
 
         if not run:
-            return error_response('Test run not found', 404)
+            return error_response('Validation record not found', 404)
 
         return success_response({
             'run_id': run['run_id'],
@@ -136,7 +136,7 @@ def report_generator_handler(event, context):
         report_format = body.get('format', 'html')
 
         if not run_id:
-            return error_response('Missing run_id', 400)
+            return error_response('Validation ID is required', 400)
 
         report_id = f"{run_id}-{report_format}"
         bucket = os.environ.get('S3_BUCKET')
@@ -190,7 +190,7 @@ def report_download_handler(event, context):
         report = test_reports_db.get_report(report_id)
 
         if not report:
-            return error_response('Report not found', 404)
+            return error_response('Report file not found. Please run a validation check first.', 404)
 
         # Generate presigned URL (valid 24 hours)
         bucket = os.environ.get('S3_BUCKET')
