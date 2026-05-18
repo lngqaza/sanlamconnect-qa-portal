@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Play, Download, Clock, CheckCircle, AlertCircle, Loader, ChevronDown, Filter } from 'lucide-react';
 import './App.css';
+import { TopNavigation } from './Navigation';
 
 interface TestRun {
   run_id: string;
@@ -154,6 +155,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950">
+      <TopNavigation />
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700 px-6 py-8">
